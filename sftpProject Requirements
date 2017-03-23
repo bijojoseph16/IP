@@ -1,0 +1,43 @@
+SFTP using reliable UDP
+ *Protocol used UDP
+ *Reliablity provided by GBN and ARQ
+
+UDP Client
+ * Sends data packets
+ * Input
+   @ param FileName - name of the file to send
+   @ param MSS - the maximum number of data bytes in a segment, exclude header
+   @ param N - the number of segments(data + header) that can be sent without receiving an ACK
+ * rdt_send()
+   Reads data from a file on a byte by byte basis
+ * GBN()
+   Gets data from rdt_send() buffer 1MSS worth of data
+   and then sends it to the received with a header attached.
+ 
+UDP Server
+ * Listens of port 7735
+ * Implements receiver side of GBN
+ * Recives data packets
+ * Sends ACK for packets without error, else does nothing
+ 
+ 
+Data Packet
+ * Header
+   - 32 bit sequenece number
+     - Sequence Numbers Start from 0
+   - 16 bit checksum, computed the same as UDP checksum
+   - 16-bit field that has the value 0101010101010101, indicating that this is a data packet.
+   
+ACK packet
+  * Header
+    - 32 bit sequence number
+      - Sequence number will be of the packet to be received at the receiver
+    - 16 bit field all zeros
+    - 16-bit field that has the value 1010101010101010, indicating that this is an ACK packet. 
+
+Error Generation
+  * @param p - loss probability
+  * @param r - random number
+  * if r <= p packet is discarded at server to simulate loss, otherwise accepted.
+  
+
