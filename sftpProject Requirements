@@ -9,10 +9,8 @@ UDP Client
    @ param MSS - the maximum number of data bytes in a segment, exclude header
    @ param N - the number of segments(data + header) that can be sent without receiving an ACK
  * rdt_send()
-   Reads data from a file on a byte by byte basis
- * GBN()
-   Gets data from rdt_send() buffer 1MSS worth of data
-   and then sends it to the received with a header attached.
+   Reads data from a file on a byte by byte basis and makes a packet that is atmost 1MSS
+   before sending it.
  
 UDP Server
  * Listens of port 7735
