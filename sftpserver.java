@@ -45,7 +45,7 @@ public class sftpserver
      while(true){
        packet = new DatagramPacket(packetBuffer, packetBuffer.length);
        socket.receive(packet);
-       if(Math.random() > 0.05) {
+       if(Math.random() > 0.9) {
          try {
            output = new FileOutputStream(outputFile, true);
            packetBuffer = packet.getData();
