@@ -12,16 +12,21 @@ public class sftpclient
     int seqNo = 0;
     int maxSeqNo = 0;
     int ACKNo = 0;
+    int oldACKNo =-1;
     int offset = 0;
-    int MSS = 1000;
+    int windowSize = Integer.parseInt(args[3]);
+    int MSS = Integer.parseInt(args[4]);
     int dataSize;
     int packetHeaderSize = 4;
     int fileSize = (int)message.length();
     int packetsBufferSize = (int)(fileSize + (packetHeaderSize * Math.ceil((float)fileSize/MSS)));
-    System.out.println(packetsBufferSize);
+    int beginWindow = 0;
+    int endWindow = windowSize * (MSS + packetHeaderSize);
+    int initialSeqNo = 0;
+    System.out.println("Packet Buffer Size: "+packetsBufferSize);
     FileInputStream input = null;
     byte[] messageBuffer = new byte[(int)message.length()];
-    System.out.println(fileSize);
+    System.out.println("File Size: "+fileSize);
     byte[] packetBuffer = null;
     byte[] ACKBuffer = new byte[4];
     byte[] packetsBuffer;
@@ -64,8 +69,8 @@ public class sftpclient
           if (messageBuffer.length - offset > MSS) {
               dataSize = MSS;
               Packet p = new Packet(messageBuffer, offset, dataSize, seqNo);
-              System.out.println("Offset: " + offset);
-              System.out.println("Packet Size: " + dataSize);     
+              //System.out.println("Offset: " + offset);
+              //System.out.println("Packet Size: " + dataSize);     
               packetBuffer = p.rdtsend();
               packetsByteBuffer.put(packetBuffer);
               seqNo += 1;
@@ -73,20 +78,20 @@ public class sftpclient
                                   
           }
           else {
-              System.out.println("Offset " +offset);
-              System.out.println("Messg buffer length "+messageBuffer.length);
+              //System.out.println("Offset " +offset);
+              //System.out.println("Messg buffer length "+messageBuffer.length);
               dataSize = messageBuffer.length - offset;
-              System.out.println("Packet Size "+dataSize);
+              //System.out.println("Packet Size "+dataSize);
               Packet p = new Packet(messageBuffer, offset, dataSize, seqNo);
               packetBuffer = p.rdtsend();
-              System.out.println("packet buffer length"+packetBuffer.length);
+              //System.out.println("packet buffer length"+packetBuffer.length);
               packetsByteBuffer.put(packetBuffer);
               offset = offset + dataSize; 
-              maxSeqNo = seqNo + 1;
+              maxSeqNo = seqNo;
              
           } 
         }
-        input.close();
+        
       }
       //System.out.println("Finished Transmission");
       //input.close();
@@ -101,62 +106,68 @@ public class sftpclient
     seqNo = 0;
     packetsBuffer = packetsByteBuffer.array();
     int bytesSent = 0;
-    System.out.println("Maximum Sequence number" + maxSeqNo);
+    //System.out.println("Maximum Sequence number" + maxSeqNo);
     try {
-      while (seqNo < maxSeqNo) {
+      while (ACKNo < maxSeqNo) {
     	try {
-    	if (packetsBuffer.length - bytesSent > MSS + packetHeaderSize) {
-    		packet = new DatagramPacket(packetsBuffer, bytesSent, MSS + packetHeaderSize, address, port);
-            socket.send(packet);
-            System.out.println("Sent packet with sequence number " + seqNo);
-            System.out.println("Waiting for ACK");
-            ACKsocket.setSoTimeout(100);
-            ACKsocket.receive(ACKpacket);
-            System.out.println("Received ACK");
-            ACKBuffer = ACKpacket.getData();
-            ACKByteBuffer.put(ACKBuffer);
-            ACKByteBuffer.rewind();
-            ACKNo = ACKByteBuffer.getInt(0);
-            if (ACKNo == seqNo) {
-              bytesSent = bytesSent + MSS + packetHeaderSize;
-              System.out.println("Received ACK packet for sequence number" + seqNo);
-              seqNo = seqNo + 1;
+    	 while(bytesSent < endWindow) {
+    	   //System.out.println("Begin Window:"+beginWindow);
+    	   System.out.println("End Window:"+endWindow);
+    	   System.out.println("BytesSent"+bytesSent);
+           if(packetsBuffer.length - bytesSent > MSS + packetHeaderSize) {
+    		 packet = new DatagramPacket(packetsBuffer, bytesSent, MSS + packetHeaderSize, address, port);
+             socket.send(packet);
+             //System.out.println("Sent packet with sequence number " + seqNo);
+             seqNo++;
+             bytesSent += MSS + packetHeaderSize;
             }
-            else {
-              System.out.println("Packet Loss");
-              System.out.println("Lost packet with sequence number" + seqNo);
-            }  
-        }
-    	else {
-    		packet = new DatagramPacket(packetsBuffer, bytesSent, packetsBuffer.length - bytesSent, address, port);
-            socket.send(packet);
-            System.out.println("Sent packet with sequence number " + seqNo);
-            System.out.println("Waiting for ACK");
-            ACKsocket.setSoTimeout(100);
-            ACKsocket.receive(ACKpacket);
-            System.out.println("Received ACK");
-            ACKBuffer = ACKpacket.getData();
-            ACKByteBuffer.put(ACKBuffer);
-            ACKByteBuffer.rewind();
-            ACKNo = ACKByteBuffer.getInt(0);
-            if (ACKNo == seqNo) {
-              bytesSent = bytesSent + MSS + packetHeaderSize;
-              System.out.println("Received ACK packet for sequence number" + seqNo);
-              seqNo = seqNo + 1;
+    	    else {
+    	      System.out.println("Last packet");
+    		  packet = new DatagramPacket(packetsBuffer, bytesSent, packetsBuffer.length - bytesSent, address, port);
+              socket.send(packet);
+              //System.out.println("Sent packet with sequence number " + seqNo);
+              seqNo++; 
+              bytesSent += MSS + packetHeaderSize;
             }
-            else {
-              System.out.println("Packet Loss");
-              System.out.println("Lost packet with sequence number" + seqNo);
-            }
-    	}
+         }
+    	 ACKsocket.setSoTimeout(1000);
+         ACKsocket.receive(ACKpacket);
+         //System.out.println("Received ACK");
+         ACKBuffer = ACKpacket.getData();
+         ACKByteBuffer.put(ACKBuffer);
+         ACKByteBuffer.rewind();
+         ACKNo = ACKByteBuffer.getInt(0);
+         //System.out.println("ACK number is "+ACKNo);
+         
+                  
+         if (ACKNo <= seqNo) {
+        	 System.out.println("Old Ack"+oldACKNo);
+        	 System.out.println("AckNo"+ACKNo);
+        	 beginWindow = beginWindow + (ACKNo - oldACKNo) * (MSS + packetHeaderSize);
+        	 if(endWindow < packetsBuffer.length) {
+        	 endWindow = endWindow + (ACKNo - oldACKNo) * (MSS + packetHeaderSize);
+        	 }
+        	 if(endWindow > packetsBuffer.length) {
+        		 endWindow = packetsBuffer.length;
+        	 }
+        	 oldACKNo = ACKNo;
+        	 //initialSeqNo = ACKNo;
+        	 //ACKsocket = new DatagramSocket(7736);
+         }
+
     	}catch(SocketTimeoutException e) {
-                ACKsocket.close();
-    		System.out.println("Packet Loss occurred at "+seqNo);
+            ACKsocket.close();
+    	 	seqNo = ACKNo + 1;
+    	 	System.out.println("Timeout, sequence number = "+seqNo);
+    	 	bytesSent = seqNo * (MSS + packetHeaderSize);
+    	 	//beginWindow = seqNo*(MSS + packetHeaderSize);
+    	 	//endWindow = (initialSeqNo + 1)*windowSize*(MSS + packetHeaderSize);
     		ACKsocket = new DatagramSocket(7736);
     		continue;
     	}
       }
       socket.close();
+      input.close();
     }catch(IOException e) {
     	e.printStackTrace();
     }	
