@@ -8,6 +8,7 @@ public class sftpserver
     int port = Integer.parseInt(args[0]);
     String file = args[1];
     File outputFile = new File(file);
+    double p = Double.parseDouble(args[2]);
     byte[] messageBuffer = new byte[1000];
     byte[] packetBuffer = new byte[1004]; //Size of packet is 1004
     byte[] ACKBuffer = new byte[4];
@@ -45,32 +46,33 @@ public class sftpserver
      while(true){
        packet = new DatagramPacket(packetBuffer, packetBuffer.length);
        socket.receive(packet);
-       if(Math.random() > 0.9) {
-         try {
-           output = new FileOutputStream(outputFile, true);
-           packetBuffer = packet.getData();
-           ByteBuffer packetByteBuffer = ByteBuffer.allocate(packetBuffer.length);
-           packetByteBuffer.put(packetBuffer);
-           seqNo = packetByteBuffer.getInt(0);
-           packetByteBuffer.position(4);
-           packetByteBuffer.get(messageBuffer);
-           ACKNo = seqNo;
-           ackByteBuffer.putInt(0,ACKNo);
-           ACKBuffer = ackByteBuffer.array();
-           ACKpacket = new DatagramPacket(ACKBuffer,0, 4, address, 7736);                  
-           output.write(packetBuffer, 4, packet.getLength()-4);
-           System.out.println("Packet Length: "+packet.getLength());
-           System.out.println("Data Length: "+(packet.getLength()-4));
-           System.out.println("Received Packet With sequence number: " + seqNo);
-           output.close();
-           ACKsocket.send(ACKpacket);
+       try {
+         output = new FileOutputStream(outputFile, true);
+         packetBuffer = packet.getData();
+         ByteBuffer packetByteBuffer = ByteBuffer.allocate(packetBuffer.length);
+         packetByteBuffer.put(packetBuffer);
+         seqNo = packetByteBuffer.getInt(0);
+         packetByteBuffer.position(4);
+         packetByteBuffer.get(messageBuffer);
+         ACKNo = seqNo;
+         if(Math.random() <= p) {
+           System.out.println("Packet loss, sequence number = " + ACKNo);
+          }
+          
+         else {
+          ackByteBuffer.putInt(0,ACKNo);
+          ACKBuffer = ackByteBuffer.array();
+          ACKpacket = new DatagramPacket(ACKBuffer,0, 4, address, 7736);                  
+          output.write(packetBuffer, 4, packet.getLength()-4);
+          //System.out.println("Packet Length: "+packet.getLength());
+          //System.out.println("Data Length: "+(packet.getLength()-4));
+          //System.out.println("Received Packet With sequence number: " + seqNo);
+          output.close();
+          ACKsocket.send(ACKpacket);
+          }
          }catch(FileNotFoundException e){
             e.printStackTrace();
          }       
-       }
-       else {
-    	   System.out.println("Packet Loss");
-       }
      }
    }catch(FileNotFoundException e) {
       e.printStackTrace();
