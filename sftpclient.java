@@ -130,9 +130,9 @@ public class sftpclient
               bytesSent += MSS + packetHeaderSize;
             }
          }
-    	 ACKsocket.setSoTimeout(1000);
+    	 ACKsocket.setSoTimeout(20000);
          ACKsocket.receive(ACKpacket);
-         //System.out.println("Received ACK");
+         System.out.println("Received ACK");
          ACKBuffer = ACKpacket.getData();
          ACKByteBuffer.put(ACKBuffer);
          ACKByteBuffer.rewind();
