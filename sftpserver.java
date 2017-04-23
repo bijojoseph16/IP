@@ -1,6 +1,8 @@
 import java.io.*;
+import java.math.*;
 import java.net.*;
 import java.nio.*;
+import java.util.*;
 public class sftpserver 
 {
   public static void main(String[] args)
@@ -12,7 +14,12 @@ public class sftpserver
     byte[] messageBuffer = new byte[1000];
     byte[] packetBuffer = new byte[1004]; //Size of packet is 1004
     byte[] ACKBuffer = new byte[4];
-    ByteBuffer ackByteBuffer = ByteBuffer.allocate(4);
+    String ACKP = "1010101010101010";
+    byte[] bACKP = new BigInteger(ACKP, 2).toByteArray();
+    String zeros = "0000000000000000";
+    byte[] bZeros = new BigInteger(zeros, 2).toByteArray();
+
+    ByteBuffer ackByteBuffer = ByteBuffer.allocate(8);
     FileOutputStream output = null;
     DatagramSocket socket = null;
     DatagramSocket ACKsocket = null;
@@ -35,17 +42,18 @@ public class sftpserver
       e.printStackTrace();
     }
     
-    try {
+    /*try {
       address = InetAddress.getByName("localhost");  
     }catch(UnknownHostException e) {
        e.printStackTrace(); 
-    }
+    }*/
     
     try {
       
      while(true){
        packet = new DatagramPacket(packetBuffer, packetBuffer.length);
        socket.receive(packet);
+       address = packet.getAddress();
        try {
          output = new FileOutputStream(outputFile, true);
          packetBuffer = packet.getData();
@@ -61,8 +69,13 @@ public class sftpserver
           
          else {
           ackByteBuffer.putInt(0,ACKNo);
+          ackByteBuffer.position(4);
+          ackByteBuffer.put(bACKP);
+          ackByteBuffer.position(6);
+          ackByteBuffer.put(bZeros);
           ACKBuffer = ackByteBuffer.array();
-          ACKpacket = new DatagramPacket(ACKBuffer,0, 4, address, 7736);                  
+          System.out.println("ACK Buffer: "+Arrays.toString(ACKBuffer));
+          ACKpacket = new DatagramPacket(ACKBuffer,0, 8, address, 7736);                  
           output.write(packetBuffer, 4, packet.getLength()-4);
           //System.out.println("Packet Length: "+packet.getLength());
           //System.out.println("Data Length: "+(packet.getLength()-4));
