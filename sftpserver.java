@@ -9,7 +9,7 @@ public class sftpserver
    @param port -port the server listens on
    @param file - output file to write to
    @param outputFile - points to the @param file to write to
-   @param p - loss propabibilty
+   @param p - loss probabibilty
    @param messageBuffer - To store data received from packet sent by client
    @param packetBuffer - To store packets recived from client
    @param ACKBuffer - Store the ACkNo
@@ -25,6 +25,36 @@ public class sftpserver
    @param ACKpacket - to send ACK packet to client
    @param address - address of the client
    */
+	  /*public static int calculateCheckSum(byte[] data) {
+		  int length = data.length;
+		  int i = 0;
+		  int checksum = 0;
+		  int sum;
+		    while (length > 1) {
+		      sum = (((data[i] << 8) & 0xFF00) | ((data[i + 1]) & 0xFF));
+		      checksum += sum;
+		 
+		      if ((checksum & 0xFFFF0000) > 0) {
+		        checksum = checksum & 0xFFFF;
+		        checksum += 1;
+		      }
+
+		      i += 2;
+		      length -= 2;
+		    }
+
+		     if (length > 0) {
+		      checksum += (data[i] << 8 & 0xFF00);
+		      if ((checksum & 0xFFFF0000) > 0) {
+		        checksum = checksum & 0xFFFF;
+		        checksum += 1;
+		      }
+		    }
+		    checksum = ~checksum;
+		    checksum = checksum & 0xFFFF;
+		    return checksum;
+		  }*/
+
   public static void main(String[] args)
   {
     int port = Integer.parseInt(args[0]);
@@ -47,7 +77,8 @@ public class sftpserver
     DatagramPacket ACKpacket = null;
     InetAddress address = null;
     int seqNo;
-    int ACKNo;
+    //int ACKNo;
+    int expectedACK = 0;
 
     /*
      Socket to receive packets from client
@@ -86,22 +117,44 @@ public class sftpserver
          seqNo = packetByteBuffer.getInt(0);
          packetByteBuffer.position(4);
          packetByteBuffer.get(messageBuffer);
-         ACKNo = seqNo;
+         //int checksum ;
+         //checksum = calculateCheckSum(messageBuffer);
+         //System.out.println("Check Sum for Packet "+seqNo+" is"+checksum);
+         //ACKNo = seqNo;
          if(Math.random() <= p) {
-           System.out.println("Packet loss, sequence number = " + ACKNo);
+           System.out.println("Packet loss, sequence number = " + seqNo);
           }
           
          else {
-          ackByteBuffer.putInt(0,ACKNo);
-          ackByteBuffer.position(4);
-          ackByteBuffer.put(bACKP);
-          ackByteBuffer.position(6);
-          ackByteBuffer.put(bZeros);
-          ACKBuffer = ackByteBuffer.array();
-          ACKpacket = new DatagramPacket(ACKBuffer,0, 8, address, 7736);                  
-          output.write(packetBuffer, 4, packet.getLength()-4);
-          output.close();
-          ACKsocket.send(ACKpacket);
+        	 if(expectedACK == seqNo) {
+        	   //System.out.println("Receved ACK No"+expectedACK+"and SeqNo "+seqNo);
+               ackByteBuffer.putInt(0,expectedACK);
+               ackByteBuffer.position(4);
+               ackByteBuffer.put(bACKP);
+               ackByteBuffer.position(6);
+               ackByteBuffer.put(bZeros);
+               ACKBuffer = ackByteBuffer.array();
+               ACKpacket = new DatagramPacket(ACKBuffer,0, 8, address, 7736);                  
+               output.write(packetBuffer, 4, packet.getLength()-4);
+               output.close();
+               ACKsocket.send(ACKpacket);
+               expectedACK += 1;
+        	 }
+        	 //else{
+                   //System.out.println("ACK different from SeqNo");
+          	   //System.out.println("Receved ACK No "+expectedACK+" and SeqNo "+seqNo);
+                 /*ackByteBuffer.putInt(0,expectedACK);
+                 ackByteBuffer.position(4);
+                 ackByteBuffer.put(bACKP);
+                 ackByteBuffer.position(6);
+                 ackByteBuffer.put(bZeros);
+                 ACKBuffer = ackByteBuffer.array();
+                 ACKpacket = new DatagramPacket(ACKBuffer,0, 8, address, 7736);                  
+                 output.write(packetBuffer, 4, packet.getLength()-4);
+                 output.close();
+                 ACKsocket.send(ACKpacket);*/
+          	 //}
+        	 //System.out.println("Receved ACK No"+expectedACK+"and SeqNo "+seqNo);
           }
          }catch(FileNotFoundException e){
             e.printStackTrace();
