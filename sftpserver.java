@@ -5,6 +5,26 @@ import java.nio.*;
 import java.util.*;
 public class sftpserver 
 {
+  /*
+   @param port -port the server listens on
+   @param file - output file to write to
+   @param outputFile - points to the @param file to write to
+   @param p - loss propabibilty
+   @param messageBuffer - To store data received from packet sent by client
+   @param packetBuffer - To store packets recived from client
+   @param ACKBuffer - Store the ACkNo
+   @param ACKP - Denotes it is an ack packet
+   @param bACKP - Store @param ACKP in a bytesArray
+   @param zeros - Header portion of ACK packet
+   @param bZeros - Store @param zeros in a bytesArray
+   @param ackByteBuffer - To store the ack packet before sending
+   @param output - to write to output file
+   @param socket - to receive packets
+   @param ACKsocket - to send ACKs
+   @param packet - to get the packet send by clinet
+   @param ACKpacket - to send ACK packet to client
+   @param address - address of the client
+   */
   public static void main(String[] args)
   {
     int port = Integer.parseInt(args[0]);
@@ -29,27 +49,31 @@ public class sftpserver
     int seqNo;
     int ACKNo;
 
-
+    /*
+     Socket to receive packets from client
+     */
     try {
       socket = new DatagramSocket(port);
     }catch (IOException e) {
       e.printStackTrace();
     }
     
+    /*
+     Socket to send ACK to client
+     */
     try {
       ACKsocket = new DatagramSocket();
     }catch (IOException e) {
       e.printStackTrace();
     }
-    
-    /*try {
-      address = InetAddress.getByName("localhost");  
-    }catch(UnknownHostException e) {
-       e.printStackTrace(); 
-    }*/
-    
+       
     try {
-      
+     /*
+      When the server receives a packet it drops it with a 
+      the random number it generates it less than loss probability.
+      If not it will write the contents to an output file and send an ACK
+      to the client
+      */ 
      while(true){
        packet = new DatagramPacket(packetBuffer, packetBuffer.length);
        socket.receive(packet);
@@ -74,12 +98,8 @@ public class sftpserver
           ackByteBuffer.position(6);
           ackByteBuffer.put(bZeros);
           ACKBuffer = ackByteBuffer.array();
-          System.out.println("ACK Buffer: "+Arrays.toString(ACKBuffer));
           ACKpacket = new DatagramPacket(ACKBuffer,0, 8, address, 7736);                  
           output.write(packetBuffer, 4, packet.getLength()-4);
-          //System.out.println("Packet Length: "+packet.getLength());
-          //System.out.println("Data Length: "+(packet.getLength()-4));
-          //System.out.println("Received Packet With sequence number: " + seqNo);
           output.close();
           ACKsocket.send(ACKpacket);
           }
