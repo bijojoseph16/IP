@@ -3,12 +3,45 @@ import java.net.*;
 import java.nio.*;
 public class sftpclient
 {
+  /*
+   @param hostname - name of the host to connect to 
+   @param port - port number to connect to the server
+   @param filename - name of the file to send
+   @param input - used to read contents of @param filename to put into a buffer
+   @param message - File that points to filename
+   @param seqno - sequence number of the packets being sent
+   @param maxSeqNo - total number of packets sent
+   @param ACKNo - Acknowledgement number received from the server
+   @param oldACKNo - Used to keep tack of the last ACKNo to increase the window size
+   @param offset - Used to grab bytes from the desired position
+   @param windowSize - Set window size
+   @param MSS - Maximum segment size
+   @param dataSize - Keeps size of data not equal to MSS for last packet
+   @param packetHeaderSize - packet Header size
+   @param fileSize - Size of the file being read
+   @param packetBufferSize - Buffer to keep all the packets as they are being read from the file, header is also added
+   @param beginWindow - Start of window
+   @param endWindow - End of window
+   @param messageBuffer - used to store data to send
+   @param packetBuffer - store the resulting packet to be sent
+   @param ACKBuffer - store tha ACK packet received
+   @param packetsBuffer - store all the packets
+   @param packetsByteBuffer - stores the packets as recived from packetsBuffer, packets are then sent to server
+                              from packetsByteBuffer
+   @param ACKByteBuffer - receives the ACK packets from the server are store here
+   @param socket - to send packets to server
+   @param packet - packet to send to server
+   @param ACKsocket - to receive ACKs from server
+   @param ACKpacket - ACK packet received from server
+   @param address - address of the server
+   */
   public static void main(String[] args) 
   {
     String hostname = args[0];
     int port = Integer.parseInt(args[1]);
     String filename = args[2];
     File message = new File(filename);
+    FileInputStream input = null;
     int seqNo = 0;
     int maxSeqNo = 0;
     int ACKNo = 0;
@@ -22,41 +55,49 @@ public class sftpclient
     int packetsBufferSize = (int)(fileSize + (packetHeaderSize * Math.ceil((float)fileSize/MSS)));
     int beginWindow = 0;
     int endWindow = windowSize * (MSS + packetHeaderSize);
-    int initialSeqNo = 0;
-    System.out.println("Packet Buffer Size: "+packetsBufferSize);
-    FileInputStream input = null;
     byte[] messageBuffer = new byte[(int)message.length()];
-    System.out.println("File Size: "+fileSize);
     byte[] packetBuffer = null;
-    byte[] ACKBuffer = new byte[4];
+    byte[] ACKBuffer = new byte[8];
     byte[] packetsBuffer;
     ByteBuffer packetsByteBuffer = ByteBuffer.allocate(packetsBufferSize);
-    ByteBuffer ACKByteBuffer = ByteBuffer.allocate(4);
+    ByteBuffer ACKByteBuffer = ByteBuffer.allocate(8);
     DatagramSocket socket = null;
     DatagramPacket packet = null;
     DatagramSocket ACKsocket = null;
     DatagramPacket ACKpacket = new DatagramPacket(ACKBuffer, ACKBuffer.length);
     InetAddress address = null;
     
-    
+    /*
+     To read the contents of @param message create an input stream 
+     */
     try {
       input = new FileInputStream(message);
     }catch(FileNotFoundException e) {
       e.printStackTrace();  
     }
     
+    /*
+     Create a socket to send packets
+     */
     try {
       socket = new DatagramSocket();
     } catch(IOException e){
       e.printStackTrace();
     }
-
+   
+    /*
+     Create a scocket to receive packets
+     */
     try {
       ACKsocket = new DatagramSocket(7736);
+
     } catch(IOException e){
       e.printStackTrace();
     }
     
+    /*
+     Get the address of the server
+     */
     try {
       address = InetAddress.getByName(hostname);  
     }catch(UnknownHostException e) {
@@ -64,13 +105,16 @@ public class sftpclient
     }
     
     try {
+      /*
+       Read the contents of the file to send and used rdtsend() to make a packet
+       all the packets to send will be stored in @param packetsByteBuffer.All packets 
+       except the last packet will have data size MSS.
+       */
       while(input.read(messageBuffer) > 0) {
         while(offset < messageBuffer.length) {
           if (messageBuffer.length - offset > MSS) {
               dataSize = MSS;
               Packet p = new Packet(messageBuffer, offset, dataSize, seqNo);
-              //System.out.println("Offset: " + offset);
-              //System.out.println("Packet Size: " + dataSize);     
               packetBuffer = p.rdtsend();
               packetsByteBuffer.put(packetBuffer);
               seqNo += 1;
@@ -78,13 +122,9 @@ public class sftpclient
                                   
           }
           else {
-              //System.out.println("Offset " +offset);
-              //System.out.println("Messg buffer length "+messageBuffer.length);
               dataSize = messageBuffer.length - offset;
-              //System.out.println("Packet Size "+dataSize);
               Packet p = new Packet(messageBuffer, offset, dataSize, seqNo);
               packetBuffer = p.rdtsend();
-              //System.out.println("packet buffer length"+packetBuffer.length);
               packetsByteBuffer.put(packetBuffer);
               offset = offset + dataSize; 
               maxSeqNo = seqNo;
@@ -93,7 +133,6 @@ public class sftpclient
         }
         
       }
-      //System.out.println("Finished Transmission");
       //input.close();
       //socket.close();
       //ACKsocket.close();
@@ -106,43 +145,40 @@ public class sftpclient
     seqNo = 0;
     packetsBuffer = packetsByteBuffer.array();
     int bytesSent = 0;
-    //System.out.println("Maximum Sequence number" + maxSeqNo);
+    
     try {
+      /*
+       Packets are sent as long as window size permits.If window permit packets to be sent all the 
+       packets will be sent, then no packets can be sent until an ACK arrive which will move the window.
+       A timer is set for the packets sent if no ACK is received and timer expires then all the packets starting
+       after the last ACK'd packet are sent again.     
+       */
       while (ACKNo < maxSeqNo) {
     	try {
     	 while(bytesSent < endWindow) {
-    	   //System.out.println("Begin Window:"+beginWindow);
-    	   System.out.println("End Window:"+endWindow);
-    	   System.out.println("BytesSent"+bytesSent);
            if(packetsBuffer.length - bytesSent > MSS + packetHeaderSize) {
-    		 packet = new DatagramPacket(packetsBuffer, bytesSent, MSS + packetHeaderSize, address, port);
+             packet = new DatagramPacket(packetsBuffer, bytesSent, MSS + packetHeaderSize, address, port);
              socket.send(packet);
-             //System.out.println("Sent packet with sequence number " + seqNo);
              seqNo++;
              bytesSent += MSS + packetHeaderSize;
             }
     	    else {
-    	      System.out.println("Last packet");
+    	      //System.out.println("Last packet");
     		  packet = new DatagramPacket(packetsBuffer, bytesSent, packetsBuffer.length - bytesSent, address, port);
               socket.send(packet);
-              //System.out.println("Sent packet with sequence number " + seqNo);
               seqNo++; 
               bytesSent += MSS + packetHeaderSize;
             }
          }
-    	 ACKsocket.setSoTimeout(20000);
+    	 ACKsocket.setSoTimeout(20);
          ACKsocket.receive(ACKpacket);
-         System.out.println("Received ACK");
          ACKBuffer = ACKpacket.getData();
          ACKByteBuffer.put(ACKBuffer);
          ACKByteBuffer.rewind();
          ACKNo = ACKByteBuffer.getInt(0);
-         //System.out.println("ACK number is "+ACKNo);
-         
-                  
+                           
+         //Moves the window on the basis of ACKs received
          if (ACKNo <= seqNo) {
-        	 System.out.println("Old Ack"+oldACKNo);
-        	 System.out.println("AckNo"+ACKNo);
         	 beginWindow = beginWindow + (ACKNo - oldACKNo) * (MSS + packetHeaderSize);
         	 if(endWindow < packetsBuffer.length) {
         	 endWindow = endWindow + (ACKNo - oldACKNo) * (MSS + packetHeaderSize);
@@ -151,17 +187,16 @@ public class sftpclient
         		 endWindow = packetsBuffer.length;
         	 }
         	 oldACKNo = ACKNo;
-        	 //initialSeqNo = ACKNo;
-        	 //ACKsocket = new DatagramSocket(7736);
+        	 
          }
 
     	}catch(SocketTimeoutException e) {
             ACKsocket.close();
     	 	seqNo = ACKNo + 1;
     	 	System.out.println("Timeout, sequence number = "+seqNo);
-    	 	bytesSent = seqNo * (MSS + packetHeaderSize);
-    	 	//beginWindow = seqNo*(MSS + packetHeaderSize);
-    	 	//endWindow = (initialSeqNo + 1)*windowSize*(MSS + packetHeaderSize);
+    	 	//@param bytesSent will be reduced to include all packets that have been ACK'd
+                //when timeoutoccurs
+                bytesSent = seqNo * (MSS + packetHeaderSize);
     		ACKsocket = new DatagramSocket(7736);
     		continue;
     	}
