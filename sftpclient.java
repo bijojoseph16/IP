@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.nio.*;
+import java.util.*;
 public class sftpclient
 {
   /*
@@ -55,6 +56,8 @@ public class sftpclient
     int packetsBufferSize = (int)(fileSize + (packetHeaderSize * Math.ceil((float)fileSize/MSS)));
     int beginWindow = 0;
     int endWindow = windowSize * (MSS + packetHeaderSize);
+    long start;
+    long end;
     byte[] messageBuffer = new byte[(int)message.length()];
     byte[] packetBuffer = null;
     byte[] ACKBuffer = new byte[8];
@@ -106,7 +109,7 @@ public class sftpclient
     
     try {
       /*
-       Read the contents of the file to send and used rdtsend() to make a packet
+       Read the conntents of the file to send and used rdtsend() to make a packet
        all the packets to send will be stored in @param packetsByteBuffer.All packets 
        except the last packet will have data size MSS.
        */
@@ -153,12 +156,14 @@ public class sftpclient
        A timer is set for the packets sent if no ACK is received and timer expires then all the packets starting
        after the last ACK'd packet are sent again.     
        */
+      start = System.currentTimeMillis();
       while (ACKNo < maxSeqNo) {
     	try {
     	 while(bytesSent < endWindow) {
            if(packetsBuffer.length - bytesSent > MSS + packetHeaderSize) {
              packet = new DatagramPacket(packetsBuffer, bytesSent, MSS + packetHeaderSize, address, port);
              socket.send(packet);
+             //System.out.println("Sent Packet with seqNO "+seqNo);
              seqNo++;
              bytesSent += MSS + packetHeaderSize;
             }
@@ -166,6 +171,7 @@ public class sftpclient
     	      //System.out.println("Last packet");
     		  packet = new DatagramPacket(packetsBuffer, bytesSent, packetsBuffer.length - bytesSent, address, port);
               socket.send(packet);
+              //System.out.println("Sent Packet with seqNO "+seqNo);
               seqNo++; 
               bytesSent += MSS + packetHeaderSize;
             }
@@ -176,6 +182,7 @@ public class sftpclient
          ACKByteBuffer.put(ACKBuffer);
          ACKByteBuffer.rewind();
          ACKNo = ACKByteBuffer.getInt(0);
+         //System.out.println("Received Packet with ACKNO "+ACKNo);
                            
          //Moves the window on the basis of ACKs received
          if (ACKNo <= seqNo) {
@@ -201,6 +208,8 @@ public class sftpclient
     		continue;
     	}
       }
+      end = System.currentTimeMillis();
+      System.out.println("Time to transmit File: "+(end-start));
       socket.close();
       input.close();
     }catch(IOException e) {
