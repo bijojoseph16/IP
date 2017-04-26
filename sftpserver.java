@@ -140,7 +140,8 @@ public class sftpserver
                ACKsocket.send(ACKpacket);
                expectedACK += 1;
         	 }
-        	 //else{
+        	 else{
+	           output.close();
                    //System.out.println("ACK different from SeqNo");
           	   //System.out.println("Receved ACK No "+expectedACK+" and SeqNo "+seqNo);
                  /*ackByteBuffer.putInt(0,expectedACK);
@@ -153,7 +154,7 @@ public class sftpserver
                  output.write(packetBuffer, 4, packet.getLength()-4);
                  output.close();
                  ACKsocket.send(ACKpacket);*/
-          	 //}
+          	 }
         	 //System.out.println("Receved ACK No"+expectedACK+"and SeqNo "+seqNo);
           }
          }catch(FileNotFoundException e){
